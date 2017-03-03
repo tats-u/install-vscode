@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+
+import sys
+import os
+import subprocess
+import shutil
+import requests
+
+
+def import_key():
+    gpg_key_request = requests.get(
+        "https://packages.microsoft.com/keys/microsoft.asc")
+    gpg_key_rpm = gpg_key_request.content
+    gpg_key_convert_result = subprocess.run(
+        ["gpg", "--dearmor"], input=gpg_key_rpm, stdout=subprocess.PIPE, check=True)
+    gpg_key_deb = gpg_key_convert_result.stdout
+    with open("/etc/apt/trusted.gpg.d/microsoft.gpg", "wb") as gpg_file_handler:
+        gpg_file_handler.write(gpg_key_deb)
+
+
+def add_repository():
+    with open("/etc/apt/sources.list.d/vscode.list", "w") as repository_file_handler:
+        print("deb [arch=amd64] http://packages.microsoft.com/repos/vscode stable main",
+              file=repository_file_handler)
+
+
+def install_package():
+    apt_get = "apt-get"
+    if shutil.which("apt-fast") is not None:
+        apt_get = "apt-fast"
+    subprocess.run([apt_get, "update"], check=True)
+    subprocess.run([apt_get, "-y", "install", "code"], check=True)
+
+if os.getuid() != 0:
+    print("{}: This script must be executed with the root priviledge.  "
+          "You must add `sudo' before the command.".format(sys.argv[0]), file=sys.stderr)
+    exit(1)
+
+import_key()
+add_repository()
+install_package()
